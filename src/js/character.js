@@ -20,9 +20,13 @@ export class Character {
     };
     
     // Character settings
-    this.moveSpeed = 5;
-    this.jumpForce = 10;
+    this.moveSpeed = 8; // Increased for better responsiveness
+    this.swimSpeed = 5; // Slower in water
+    this.jumpForce = 12; // Increased for better jump height
     this.isOnGround = false;
+    this.isInWater = false;
+    this.waterLevel = 0; // Water is at y=0
+    this.swimAnimationTime = 0;
     
     // Initialize
     this.loadCharacter();
@@ -47,7 +51,11 @@ export class Character {
       '/src/assets/models/character/character.ply',
       (geometry) => {
         geometry.computeVertexNormals();
-        const material = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        const material = new THREE.MeshStandardMaterial({ 
+          color: 0x8B4513,
+          roughness: 0.8,
+          metalness: 0.2
+        });
         const characterMesh = new THREE.Mesh(geometry, material);
         
         // Scale and position the model
@@ -73,8 +81,8 @@ export class Character {
     // Create a dynamic rigid body for the character
     const rigidBodyDesc = this.world.createRigidBodyDesc()
       .setTranslation(0, 2, 0)
-      .setLinearDamping(0.5)
-      .setAngularDamping(0.5)
+      .setLinearDamping(0.7) // Increased damping for smoother movement
+      .setAngularDamping(0.8) // Increased angular damping to prevent excessive rotation
       .setBodyType(RAPIER.RigidBodyType.Dynamic);
     
     this.rigidBody = this.world.createRigidBody(rigidBodyDesc);
@@ -140,6 +148,9 @@ export class Character {
     // Get current position and rotation from physics
     const position = this.rigidBody.translation();
     
+    // Check if character is in water
+    this.isInWater = position.y < this.waterLevel + 0.5;
+    
     // Update mesh position to match physics body
     this.mesh.position.set(position.x, position.y, position.z);
     
@@ -170,11 +181,39 @@ export class Character {
     if (this.moveDirection.lengthSq() > 0) {
       this.moveDirection.normalize();
       
-      // Apply force for movement
-      this.rigidBody.applyImpulse(
-        { x: this.moveDirection.x * this.moveSpeed, y: 0, z: this.moveDirection.z * this.moveSpeed },
-        true
-      );
+      // Apply different movement based on whether in water or on land
+      if (this.isInWater) {
+        // Swimming movement - can move in all directions including up/down
+        const upForce = this.keys.jump ? 2 : 0; // Press space to swim up
+        
+        this.rigidBody.applyImpulse(
+          { 
+            x: this.moveDirection.x * this.swimSpeed, 
+            y: upForce, 
+            z: this.moveDirection.z * this.swimSpeed 
+          },
+          true
+        );
+        
+        // Add buoyancy when in water
+        const buoyancyForce = (this.waterLevel - position.y) * 0.5;
+        if (buoyancyForce > 0) {
+          this.rigidBody.applyImpulse({ x: 0, y: buoyancyForce, z: 0 }, true);
+        }
+        
+        // Swimming animation
+        this.swimAnimationTime += 0.05;
+        if (this.mesh && this.moveDirection.lengthSq() > 0) {
+          // Simple bobbing motion for swimming
+          this.mesh.rotation.x = -Math.PI / 2 + Math.sin(this.swimAnimationTime) * 0.1;
+        }
+      } else {
+        // Land movement
+        this.rigidBody.applyImpulse(
+          { x: this.moveDirection.x * this.moveSpeed, y: 0, z: this.moveDirection.z * this.moveSpeed },
+          true
+        );
+      }
       
       // Rotate character to face movement direction
       if (this.moveDirection.x !== 0 || this.moveDirection.z !== 0) {
@@ -183,8 +222,8 @@ export class Character {
       }
     }
     
-    // Handle jumping
-    if (this.keys.jump && this.isOnGround) {
+    // Handle jumping (only when on ground and not in water)
+    if (this.keys.jump && this.isOnGround && !this.isInWater) {
       this.rigidBody.applyImpulse({ x: 0, y: this.jumpForce, z: 0 }, true);
       this.isOnGround = false;
     }
