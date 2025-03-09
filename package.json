@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A Three.js project with water simulation, physics, and character movement",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

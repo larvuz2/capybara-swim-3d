@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 
 export class Character {
   constructor(scene, world, camera) {
