@@ -48,7 +48,7 @@ export class Character {
     // Load the actual character model
     const loader = new PLYLoader();
     loader.load(
-      '/src/assets/models/character/character.ply',
+      './src/assets/models/character/character.ply',
       (geometry) => {
         geometry.computeVertexNormals();
         const material = new THREE.MeshStandardMaterial({ 

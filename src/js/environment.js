@@ -145,7 +145,7 @@ export class Environment {
     const loader = new GLTFLoader();
     
     loader.load(
-      '/src/assets/models/environment/environment.glb',
+      './src/assets/models/environment/environment.glb',
       (gltf) => {
         console.log('Environment model loaded successfully');
         

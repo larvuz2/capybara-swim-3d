@@ -23,19 +23,55 @@ let world, character, camera, environment;
 // Load shaders
 const loadShaders = async () => {
   try {
-    const vertexShaderResponse = await fetch('/src/shaders/vertex.glsl');
-    const fragmentShaderResponse = await fetch('/src/shaders/fragment.glsl');
+    const vertexShaderResponse = await fetch('./src/shaders/vertex.glsl');
+    let fragmentShaderResponse;
+    let fragmentShader;
+    
+    try {
+      fragmentShaderResponse = await fetch('./src/shaders/fragment.glsl');
+      fragmentShader = await fragmentShaderResponse.text();
+    } catch (fragmentError) {
+      console.warn('Failed to load complex fragment shader, trying simple version:', fragmentError);
+      fragmentShaderResponse = await fetch('./src/shaders/simple-fragment.glsl');
+      fragmentShader = await fragmentShaderResponse.text();
+    }
     
     const vertexShader = await vertexShaderResponse.text();
-    const fragmentShader = await fragmentShaderResponse.text();
     
     return { vertexShader, fragmentShader };
   } catch (error) {
     console.error('Error loading shaders:', error);
     // Provide fallback shaders if loading fails
+    const fallbackVertex = `
+      uniform mat4 modelMatrix;
+      uniform mat4 viewMatrix;
+      uniform mat4 projectionMatrix;
+      attribute vec3 position;
+      varying vec2 vUv;
+      attribute vec2 uv;
+      
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+      }
+    `;
+    
+    const fallbackFragment = `
+      uniform float iGlobalTime;
+      varying vec2 vUv;
+      
+      void main() {
+        // Simple blue water color with wave effect
+        float wave = sin(vUv.x * 10.0 + iGlobalTime) * 0.05 + 
+                    sin(vUv.y * 8.0 + iGlobalTime * 0.8) * 0.05;
+        vec3 waterColor = vec3(0.0, 0.3 + wave, 0.5 + wave);
+        gl_FragColor = vec4(waterColor, 0.8);
+      }
+    `;
+    
     return {
-      vertexShader: 'void main() { gl_Position = vec4(position, 1.0); }',
-      fragmentShader: 'void main() { gl_FragColor = vec4(0.0, 0.3, 0.5, 1.0); }'
+      vertexShader: fallbackVertex,
+      fragmentShader: fallbackFragment
     };
   }
 };
@@ -48,7 +84,10 @@ const createWater = (vertexShader, fragmentShader) => {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       iGlobalTime: { value: 0.0 },
-      iResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+      iResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      modelMatrix: { value: new THREE.Matrix4() },
+      viewMatrix: { value: new THREE.Matrix4() },
+      projectionMatrix: { value: new THREE.Matrix4() }
     },
     vertexShader: vertexShader,
     fragmentShader: fragmentShader,
@@ -183,9 +222,15 @@ const animate = () => {
   }
   
   // Update water shader time
-  const waterMaterial = scene.getObjectByName('water')?.material;
-  if (waterMaterial && waterMaterial.uniforms) {
-    waterMaterial.uniforms.iGlobalTime.value += 0.01;
+  const waterMesh = scene.getObjectByName('water');
+  if (waterMesh && waterMesh.material && waterMesh.material.uniforms) {
+    // Update time uniform
+    waterMesh.material.uniforms.iGlobalTime.value += 0.01;
+    
+    // Update matrix uniforms
+    waterMesh.material.uniforms.modelMatrix.value.copy(waterMesh.matrixWorld);
+    waterMesh.material.uniforms.viewMatrix.value.copy(camera.matrixWorldInverse);
+    waterMesh.material.uniforms.projectionMatrix.value.copy(camera.projectionMatrix);
   }
   
   // Render the scene

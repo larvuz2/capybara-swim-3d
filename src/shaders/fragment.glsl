@@ -1,5 +1,6 @@
 uniform float iGlobalTime;
 uniform vec2 iResolution;
+varying vec2 vUv;
 
 const int NUM_STEPS = 8;
 const float PI = 3.141592;
@@ -191,7 +192,7 @@ vec3 getPixel(in vec2 coord, float time) {
 
 // Main
 void main() {
-    vec2 fragCoord = gl_FragCoord.xy;
+    vec2 fragCoord = vUv * iResolution;
     vec3 color = vec3(0.0);
     
     #ifdef AA
