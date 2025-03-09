@@ -4,6 +4,7 @@ import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import * as RAPIER from '@dimforge/rapier3d-compat';
 import { Character } from './character.js';
 import { setupCamera } from './camera.js';
+import { Environment } from './environment.js';
 
 // Initialize the scene
 const scene = new THREE.Scene();
@@ -12,10 +13,12 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setClearColor(0x111122);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 container.appendChild(renderer.domElement);
 
 // Initialize physics
-let world, character, camera;
+let world, character, camera, environment;
 
 // Load shaders
 const loadShaders = async () => {
@@ -45,6 +48,7 @@ const createWater = (vertexShader, fragmentShader) => {
   const water = new THREE.Mesh(geometry, material);
   water.rotation.x = -Math.PI / 2; // Rotate to be horizontal
   water.position.y = 0;
+  water.name = 'water';
   scene.add(water);
   
   return { water, material };
@@ -67,6 +71,9 @@ const init = async () => {
   // Setup camera
   camera = setupCamera(scene);
   
+  // Create environment
+  environment = new Environment(scene, world);
+  
   // Create character
   character = new Character(scene, world, camera);
   
@@ -76,6 +83,18 @@ const init = async () => {
   
   const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
   directionalLight.position.set(5, 10, 7.5);
+  directionalLight.castShadow = true;
+  
+  // Configure shadow properties
+  directionalLight.shadow.mapSize.width = 2048;
+  directionalLight.shadow.mapSize.height = 2048;
+  directionalLight.shadow.camera.near = 0.5;
+  directionalLight.shadow.camera.far = 50;
+  directionalLight.shadow.camera.left = -20;
+  directionalLight.shadow.camera.right = 20;
+  directionalLight.shadow.camera.top = 20;
+  directionalLight.shadow.camera.bottom = -20;
+  
   scene.add(directionalLight);
   
   // Handle window resize
@@ -100,6 +119,11 @@ const animate = () => {
   // Update character
   if (character) {
     character.update();
+    
+    // Update camera to follow character
+    if (scene.updateCamera && character.getPosition) {
+      scene.updateCamera(character.getPosition());
+    }
   }
   
   // Update water shader time
