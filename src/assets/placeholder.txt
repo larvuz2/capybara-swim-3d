@@ -1,0 +1,5 @@
+This directory will contain the 3D model assets:
+- character.ply: The capybara character model
+- environment.glb: The environment assets
+
+These files need to be added manually or downloaded from a 3D model repository. 
